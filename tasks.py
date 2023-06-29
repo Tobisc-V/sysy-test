@@ -33,7 +33,7 @@ JavaImage = 'openjdk:17-oracle'
 CmdBuildCompiler = ' \
     javac -d target -encoding \'utf-8\' {cp} @target/src.txt; r=$?; if [ $r -ne 0 ]; then exit $r; fi; \
     cd target; echo \'**\' > .gitignore; mkdir -p META-INF; \
-    echo -e \'Manifest-Version: 1.0\\r\\nClass-Path: {libs}\\r\\nMain-Class: Compiler\\r\\n\\r\\n\' > META-INF/MANIFEST.MF; \
+    echo -e \'Manifest-Version: 1.0\\r\\nClass-Path: .:{libs}\\r\\nMain-Class: Compiler\\r\\n\\r\\n\' > META-INF/MANIFEST.MF; \
     jar -cvfm compiler.jar META-INF/MANIFEST.MF *'
 
 CmdCompileLLVM  = 'java {jvm} -jar compiler.jar -emit-llvm -o test.ll test.sy {opt} 2>/output/compile.log; r=$?; cp test.ll /output/; \
