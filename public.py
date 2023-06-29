@@ -21,7 +21,6 @@ CompilerSrc = config['compiler-src']      # path to the compiler source code (./
 CompilerLib = get_config('compiler-lib', "")  # path to the compiler library (./lib/)
 CompilerBuild = config['compiler-build']  # path to compiler build artifact
 CompilerFileName = 'compiler.jar'  # name of executable jar
-CompilerPath = CompilerBuild + os.sep + CompilerFileName
 
 TestcaseBaseDir = config['testcase-base']
 TestcaseSelect = config['testcase-select']

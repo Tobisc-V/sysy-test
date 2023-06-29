@@ -30,22 +30,14 @@ def container_wait(container: Container, name: str):
 
 JavaImage = 'openjdk:17-oracle'
 
-CmdBuildCompiler = ' \
-    javac -d target -encoding \'utf-8\' {cp} @target/src.txt; r=$?; if [ $r -ne 0 ]; then exit $r; fi; \
-    cd target; echo \'**\' > .gitignore; mkdir -p META-INF; \
-    echo -e \'Manifest-Version: 1.0\\r\\nClass-Path: .:{libs}\\r\\nMain-Class: Compiler\\r\\n\\r\\n\' > META-INF/MANIFEST.MF; \
-    jar -cvfm compiler.jar META-INF/MANIFEST.MF *'
+CmdBuildCompiler = 'javac -d target -encoding \'utf-8\' {lib} @target/src.txt; r=$?; if [ $r -ne 0 ]; then exit $r; fi;'
 
-CmdCompileLLVM  = 'java {jvm} -jar compiler.jar -emit-llvm -o test.ll test.sy {opt} 2>/output/compile.log; r=$?; cp test.ll /output/; \
-    exit $r'.format(jvm=JvmOptions, opt=OptOptions)
-CmdCompileARM   = 'java {jvm} -jar compiler.jar -S -o test.S test.sy {opt} 2>/output/compile.log; r=$?; cp test.S /output/; \
-    exit $r'.format(jvm=JvmOptions, opt=OptOptions)
-CmdCompileRISCV = 'java {jvm} -jar compiler.jar -S -o test.S test.sy {opt} 2>/output/compile.log; r=$?; cp test.S /output/; \
-    exit $r'.format(jvm=JvmOptions, opt=OptOptions)
-CmdCompileAll   = 'java {jvm} -jar compiler.jar -emit-llvm -o test.ll -S -o test.S test.sy {opt} 2>/output/compile.log; r=$?; cp test.S test.ll /output/; \
-    exit $r'.format(jvm=JvmOptions, opt=OptOptions)
+CmdCompileLLVM  = 'java {jvm} {lib} Compiler -emit-llvm -o test.ll test.sy {opt} 2>/output/compile.log; r=$?; cp test.ll /output/; exit $r'
+CmdCompileARM   = 'java {jvm} {lib} Compiler -S -o test.S test.sy {opt} 2>/output/compile.log; r=$?; cp test.S /output/; exit $r'
+CmdCompileRISCV = 'java {jvm} {lib} Compiler -S -o test.S test.sy {opt} 2>/output/compile.log; r=$?; cp test.S /output/; exit $r'
+CmdCompileAll   = 'java {jvm} {lib} Compiler -emit-llvm -o test.ll -S -o test.S test.sy {opt} 2>/output/compile.log; r=$?; cp test.S test.ll /output/; exit $r'
 
-CmdCompileAndRunInterpreter = 'java {jvm} -jar compiler.jar -I test.sy {opt} < input.txt >/output/output.txt 2>/output/perf.txt'.format(jvm=JvmOptions, opt=OptOptions)
+CmdCompileAndRunInterpreter = 'java {jvm} {lib} Compiler -I test.sy {opt} < input.txt >/output/output.txt 2>/output/perf.txt'
 
 SysyImage = "sysy:tobisc"
 CmdGenElf = 'ARCH={arch} sysy-asm2elf.sh test.S 2>/output/genelf.log'
@@ -63,7 +55,6 @@ def build_compiler(client: docker.DockerClient, source_path: str, artifact_path:
     with open(os.path.join(artifact_path, 'src.txt'), 'w') as fp:
         subprocess.run(['find', 'src', '-type', 'f', '-name', '*.java'], stdout=fp, cwd=os.path.dirname(source_path)).check_returncode()
     libs = ''
-    cp = ''
     volumes = {
         os.path.realpath(source_path): {'bind': '/project/src', 'mode': 'ro'},
         os.path.realpath(artifact_path): {'bind': '/project/target', 'mode': 'rw'}
@@ -71,10 +62,12 @@ def build_compiler(client: docker.DockerClient, source_path: str, artifact_path:
     if library_path:
         __ret = subprocess.run(['find', '.', '-type', 'f', '-name', '*.jar'], stdout=subprocess.PIPE, cwd=library_path)
         __ret.check_returncode()
-        libs = ' '.join([os.path.join('/project/lib', x.decode('utf-8').strip()) for x in __ret.stdout.splitlines()])
-        cp = '-cp ' + ':'.join([os.path.join('/project/lib', x.decode('utf-8').strip()) for x in __ret.stdout.splitlines()])
+        __libs = __ret.stdout.strip().splitlines()
+        if len(__libs) > 0:
+            libs = '-classpath ' + ':'.join([os.path.join('/project/lib', x.decode('utf-8').strip()) for x in __libs])
         volumes[os.path.realpath(library_path)] = {'bind': '/project/lib', 'mode': 'ro'}
-    container: Container = client.containers.run(JavaImage, command=wrap_cmd(CmdBuildCompiler.format(libs=libs, cp=cp)),
+    printLog(CmdBuildCompiler.format(lib=libs))
+    container: Container = client.containers.run(JavaImage, command=wrap_cmd(CmdBuildCompiler.format(lib=libs)),
         detach=True, name=container_name, working_dir='/project', volumes=volumes, mem_limit=MemoryLimit)
     container_wait(container, 'build_compiler')
     printLog('compiler build finished.')
@@ -90,17 +83,26 @@ def compile_testcase(client: docker.DockerClient, case_fullname: str, compiler_p
             cmd = CmdCompileAll
     elif type == 'riscv':
         cmd = CmdCompileRISCV
+        if EmitLLVM:
+            cmd = CmdCompileAll
     else:
         raise Exception("compile type {0} not support yet".format(type))
+    libs = '-classpath /compiler/compiler'
     volumes = {
-        os.path.realpath(compiler_path): {'bind': '/compiler/compiler.jar', 'mode': 'ro'},
+        os.path.realpath(compiler_path): {'bind': '/compiler/compiler', 'mode': 'ro'},
         os.path.realpath(sy_path): {'bind': '/compiler/test.sy', 'mode': 'ro'},
         os.path.realpath(output_path): {'bind': '/output/', 'mode': 'rw'}
     }
     if lib_path:
-        volumes[os.path.realpath(lib_path)] = {'bind': '/project/lib', 'mode': 'ro'}
-    container: Container = client.containers.run(JavaImage, command=wrap_cmd(cmd), detach=True, name=container_name,
-        working_dir='/compiler', volumes=volumes, mem_limit=MemoryLimit)
+        __ret = subprocess.run(['find', '.', '-type', 'f', '-name', '*.jar'], stdout=subprocess.PIPE, cwd=lib_path)
+        __ret.check_returncode()
+        __libs = __ret.stdout.strip().splitlines()
+        if len(__libs) > 0:
+            libs = '-classpath /compiler/compiler:' + ':'.join([os.path.join('/compiler/lib', x.decode('utf-8').strip()) for x in __libs])
+        volumes[os.path.realpath(lib_path)] = {'bind': '/compiler/lib', 'mode': 'ro'}
+    printLog(cmd.format(jvm=JvmOptions, opt=OptOptions, lib=libs))
+    container: Container = client.containers.run(JavaImage, command=wrap_cmd(cmd.format(jvm=JvmOptions, opt=OptOptions, lib=libs)),
+        detach=True, name=container_name, working_dir='/compiler', volumes=volumes, mem_limit=MemoryLimit)
     container_wait(container, 'compile')
     printLog('{0} - compile finish.'.format(case_fullname))
 
@@ -141,15 +143,21 @@ def run_interpreter(client: docker.DockerClient, case_fullname: str, compiler_pa
     assert extension_name == 'sy'
     container_name = 'compiler_{pid}_interpret_{name}'.format(pid=os.getpid(), name=case_fullname.replace('/', '_'))
     printLog('{0} - interpret begin.'.format(case_fullname))
+    libs = '-classpath /compiler/compiler'
     volumes={
-        os.path.realpath(compiler_path): {'bind': '/compiler/compiler.jar', 'mode': 'ro'},
+        os.path.realpath(compiler_path): {'bind': '/compiler/compiler', 'mode': 'ro'},
         os.path.realpath(sy_path): {'bind': '/compiler/test.sy', 'mode': 'ro'},
         os.path.realpath(input_path): {'bind': '/compiler/input.txt', 'mode': 'ro'},
         os.path.realpath(output_path): {'bind': '/output/', 'mode': 'rw'}
     }
     if lib_path:
-        volumes[os.path.realpath(lib_path)] = {'bind': '/project/lib', 'mode': 'ro'}
-    container: Container = client.containers.run(image=JavaImage, command=wrap_cmd(CmdCompileAndRunInterpreter), detach=True,
-        name=container_name, working_dir='/compiler', volumes=volumes, mem_limit=MemoryLimit)
+        __ret = subprocess.run(['find', '.', '-type', 'f', '-name', '*.jar'], stdout=subprocess.PIPE, cwd=lib_path)
+        __ret.check_returncode()
+        __libs = __ret.stdout.strip().splitlines()
+        if len(__libs) > 0:
+            libs = '-classpath /compiler/compiler:' + ':'.join([os.path.join('/compiler/lib', x.decode('utf-8').strip()) for x in __libs])
+        volumes[os.path.realpath(lib_path)] = {'bind': '/compiler/lib', 'mode': 'ro'}
+    container: Container = client.containers.run(image=JavaImage, command=wrap_cmd(CmdCompileAndRunInterpreter.format(jvm=JvmOptions, opt=OptOptions, lib=libs)),
+        detach=True, name=container_name, working_dir='/compiler', volumes=volumes, mem_limit=MemoryLimit)
     container_wait(container, 'interpret')
     printLog('{0} - interpret done.'.format(case_fullname))

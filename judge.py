@@ -45,7 +45,7 @@ def test_one_case(testcase: dict):
     # Compile Testcase
     if judge_type == TYPE_INTERPRET:
         try:
-            run_interpreter(DockerClient, judge['case_fullname'], CompilerPath, judge['file_src_host'], judge['file_in_host'], judge['out_dir_host'])
+            run_interpreter(DockerClient, judge['case_fullname'], CompilerBuild, judge['file_src_host'], judge['file_in_host'], judge['out_dir_host'])
             shutil.copy(os.path.join(judge['out_dir'], 'output.txt'), judge['file_out'])
             shutil.copy(os.path.join(judge['out_dir'], 'perf.txt'), judge['file_perf'])
         except Exception as e:
@@ -60,11 +60,11 @@ def test_one_case(testcase: dict):
     else:
         try:
             if judge_type == TYPE_LLVM:
-                compile_testcase(DockerClient, judge['case_fullname'], CompilerPath, judge['file_src_host'], judge['out_dir_host'], lib_path=CompilerLib, type='llvm')
+                compile_testcase(DockerClient, judge['case_fullname'], CompilerBuild, judge['file_src_host'], judge['out_dir_host'], lib_path=CompilerLib, type='llvm')
             elif judge_type == TYPE_QEMU_ARM or judge_type == TYPE_RPI or judge_type == TYPE_RPI_ELF:
-                compile_testcase(DockerClient, judge['case_fullname'], CompilerPath, judge['file_src_host'], judge['out_dir_host'], lib_path=CompilerLib, type='arm')
+                compile_testcase(DockerClient, judge['case_fullname'], CompilerBuild, judge['file_src_host'], judge['out_dir_host'], lib_path=CompilerLib, type='arm')
             elif judge_type == TYPE_QEMU_RISCV:
-                compile_testcase(DockerClient, judge['case_fullname'], CompilerPath, judge['file_src_host'], judge['out_dir_host'], lib_path=CompilerLib, type='riscv')
+                compile_testcase(DockerClient, judge['case_fullname'], CompilerBuild, judge['file_src_host'], judge['out_dir_host'], lib_path=CompilerLib, type='riscv')
             else:
                 printLog('Not Supported Judge Type: {0}'.format(judge_type))
                 return
