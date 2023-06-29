@@ -3,11 +3,10 @@
 用于 SysY 编译器的本地测试以及 CI 测试，支持多种模式:
 
 - LLVM IR (仅测试编译器前端)
-- QEMU (ARM ELF, 由交叉编译器将汇编生成 ELF)
-- 树莓派 (传输 ARM 汇编, 在 pi 上链接成 ELF)
-- 树莓派 (传输 ARM ELF, 在 x86 主机上用交叉编译器对汇编代码进行链接)
+- QEMU-ARM (ARM ELF, 由交叉编译器将汇编生成 ELF)
+- QEMU-RISCV (RISCV ELF, 由交叉编译器将汇编生成 ELF)
 
-本队伍编译器基本情况：用 Java 语言开发编译器，使用 LLVM IR 作为中层表示，前端 Lexer 和 Parser 自行编写，未使用 Antlr 等自动分析工具。（暂不支持 Antlr 和 C/C++ 开发的编译器）
+> 树莓派评测还没有修改升级，所以谨慎使用吧。
 
 ## 环境建立说明
 
@@ -27,10 +26,12 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple # �
 
 需要准备的镜像：
 
-- Java OpenJDK 15: 镜像名称 `openjdk:15-alpine`
-  - 在终端执行 `docker pull openjdk:15-alpine` 以获取。
-- GCC 与 LLVM 工具链: 镜像名称 `sysy:latest` 
-  - 克隆 [sysy-docker](https://github.com/Meow-Twice/sysy-docker) 仓库，并执行 `docker-build.sh` 构建镜像。
+- Java OpenJDK Oracle 17: 镜像名称 `openjdk:17-oracle`
+  - 在终端执行 `docker pull openjdk:17-oracle` 以获取。
+- GCC 与 LLVM 工具链: 镜像名称 `sysy:tobisc` 
+  - 克隆 [sysy-docker](https://github.com/Tobisc-V/sysy-docker) 仓库，并执行 `docker-build.sh` 构建镜像。
+
+> JDK 升级为了 17 （比赛标准），同时工具链也升级了 riscv，为了避免和原作重名，改了 tag。
 
 ### 测试用例准备
 
@@ -51,6 +52,7 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple # �
 ```jsonc
 {
     "compiler-src": "path to your compiler source code",              // 编译器的源代码目录 (Java 工程目录下的 `src` 目录)
+    "compiler-lib": "path to lib (.jar) your compiler used",          // 编译器需要使用的第三方包 (例如工程目录下的 `lib` 目录)，可为空
     "compiler-build": "path to store build output of your compiler",  // 存放编译器的 `.class` 以及 `.jar` 的目录 (例如 Java 工程目录下的 `build` 目录)
     "testcase-base": "path to the base of your testcase set",         // 测试用例集的根目录，该目录下可含有多个子目录，每个子目录代表一个测试集
     "testcase-select": ["functional", "performance"],                 // 在 `testcase-base` 所指定的测试集根目录下选取一个或多个需要运行的测试集, 该参数为字符串数组类型
@@ -62,7 +64,7 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple # �
     "memory-limit": "256m",                                           // docker 容器内存限制，如超出限制则容器被杀死，缺省值 '256m'
     "opt-options": "",                                                // 编译优化参数，追加到自己的编译器的必需参数之后，例如 "-O2"
     "emit-llvm": false,                                               // 测试后端时顺带输出 LLVM IR
-    "run-type": "llvm",                                               // 可选值 "llvm", "qemu", "rpi", "rpi-elf", "interpret"
+    "run-type": "llvm",                                               // 可选值 "llvm", "qemu-arm", "qemu-riscv", "rpi", "rpi-elf", "interpret", 树莓派相关的谨慎使用
     "rpi-addresses": ["http://192.168.1.2:9000"],                     // 树莓派 API 地址列表 (如不测试树莓派可留空)
     "log-dir": "logs",                                                // 评测记录存放路径 (可以是相对路径) 缺省值为 `logs`
     "log-dir-host": "logs",                                           // 评测记录在主机上的绝对路径 (使用 docker 运行评测脚本时才需要, 平时不需要填)
@@ -72,7 +74,8 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple # �
 评测方式 `run-type` 参数取值说明
 
 - `llvm`: 测试编译器前端，目标代码为 LLVM IR
-- `qemu`: 目标代码为 arm 汇编，使用交叉编译器生成 ELF 并用 qemu 在 x86 机器上测试目标程序
+- `qemu-arm`: 目标代码为 arm 汇编，使用交叉编译器生成 ELF 并用 qemu 在宿主机器上测试目标程序
+- `qemu-riscv`: 目标代码为 riscv 汇编，使用交叉编译器生成 ELF 并用 qemu 在宿主机器上测试目标程序
 - `rpi`: 目标代码为 arm 汇编，通过 API 在树莓派上链接生成 ELF 并运行
 - `rpi-elf`: 目标代码为 arm 汇编，用交叉编译器生成 ELF 并通过 API 在树莓派上执行
 

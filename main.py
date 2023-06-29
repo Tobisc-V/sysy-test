@@ -12,7 +12,7 @@ from rpi import setup_rpi, wait_rpi_all
 setup_rpi(RpiAddresses)
 
 if RebuildCompiler:
-    build_compiler(DockerClient, CompilerSrc, CompilerBuild)
+    build_compiler(DockerClient, CompilerSrc, CompilerBuild, CompilerLib)
 
 if CacheSource:
     archive_source(CompilerSrc, os.path.join(logDir, "src.tar.gz"))

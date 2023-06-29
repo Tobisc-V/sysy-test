@@ -60,9 +60,11 @@ def test_one_case(testcase: dict):
     else:
         try:
             if judge_type == TYPE_LLVM:
-                compile_testcase(DockerClient, judge['case_fullname'], CompilerPath, judge['file_src_host'], judge['out_dir_host'], 'llvm')
-            elif judge_type == TYPE_QEMU or judge_type == TYPE_RPI or judge_type == TYPE_RPI_ELF:
-                compile_testcase(DockerClient, judge['case_fullname'], CompilerPath, judge['file_src_host'], judge['out_dir_host'], 'arm')
+                compile_testcase(DockerClient, judge['case_fullname'], CompilerPath, judge['file_src_host'], judge['out_dir_host'], lib_path=CompilerLib, type='llvm')
+            elif judge_type == TYPE_QEMU_ARM or judge_type == TYPE_RPI or judge_type == TYPE_RPI_ELF:
+                compile_testcase(DockerClient, judge['case_fullname'], CompilerPath, judge['file_src_host'], judge['out_dir_host'], lib_path=CompilerLib, type='arm')
+            elif judge_type == TYPE_QEMU_RISCV:
+                compile_testcase(DockerClient, judge['case_fullname'], CompilerPath, judge['file_src_host'], judge['out_dir_host'], lib_path=CompilerLib, type='riscv')
             else:
                 printLog('Not Supported Judge Type: {0}'.format(judge_type))
                 return
@@ -91,13 +93,13 @@ def test_one_case(testcase: dict):
                 run_testcase(DockerClient, judge['case_fullname'], judge['file_ll_host'], judge['file_in_host'], judge['out_dir_host'], 'llvm')
                 shutil.copy(os.path.join(judge['out_dir'], 'output.txt'), judge['file_out'])
                 shutil.copy(os.path.join(judge['out_dir'], 'perf.txt'), judge['file_perf'])
-            elif judge_type == TYPE_QEMU:
+            elif judge_type == TYPE_QEMU_ARM or judge_type == TYPE_QEMU_RISCV:
                 judge['file_elf'] = os.path.join(judge['work_dir'], case_name + '.elf')
                 judge['file_elf_host'] = os.path.join(judge['work_dir_host'], case_name + '.elf')
                 open(judge['file_elf'], 'w').close()    # create an empty elf
-                genelf_testcase(DockerClient, judge['case_fullname'], judge['file_asm_host'], judge['file_elf_host'], judge['out_dir_host'])
+                genelf_testcase(DockerClient, judge['case_fullname'], judge['file_asm_host'], judge['file_elf_host'], judge['out_dir_host'], judge_type.split('-')[1])
                 os.chmod(judge['file_elf'], os.stat(judge['file_elf']).st_mode | stat.S_IEXEC)
-                run_testcase(DockerClient, judge['case_fullname'], judge['file_elf_host'], judge['file_in_host'], judge['out_dir_host'], 'qemu')
+                run_testcase(DockerClient, judge['case_fullname'], judge['file_elf_host'], judge['file_in_host'], judge['out_dir_host'], judge_type)
                 shutil.copy(os.path.join(judge['out_dir'], 'output.txt'), judge['file_out'])
                 shutil.copy(os.path.join(judge['out_dir'], 'perf.txt'), judge['file_perf'])
             elif judge_type == TYPE_RPI:

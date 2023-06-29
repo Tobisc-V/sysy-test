@@ -15,11 +15,10 @@ with open(ConfigFile, 'r') as fp:
 def get_config(key: str, default=None):
     if default is None:
         return config[key]
-    if not key in config.keys():
-        return default
-    return config[key]
+    return config.get(key, default)
 
 CompilerSrc = config['compiler-src']      # path to the compiler source code (./src/)
+CompilerLib = get_config('compiler-lib', "")  # path to the compiler library (./lib/)
 CompilerBuild = config['compiler-build']  # path to compiler build artifact
 CompilerFileName = 'compiler.jar'  # name of executable jar
 CompilerPath = CompilerBuild + os.sep + CompilerFileName

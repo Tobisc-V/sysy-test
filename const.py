@@ -8,7 +8,8 @@ OTHER_ERROR     = 'OTHER_ERROR'
 
 # 评测类型
 TYPE_LLVM       = 'llvm'
-TYPE_QEMU       = 'qemu'
+TYPE_QEMU_ARM   = 'qemu-arm'
+TYPE_QEMU_RISCV = 'qemu-riscv'
 TYPE_RPI        = 'rpi'
 TYPE_RPI_ELF    = 'rpi-elf'
 TYPE_INTERPRET  = 'interpret'
