@@ -66,7 +66,6 @@ def build_compiler(client: docker.DockerClient, source_path: str, artifact_path:
         if len(__libs) > 0:
             libs = '-classpath ' + ':'.join([os.path.join('/project/lib', x.decode('utf-8').strip()) for x in __libs])
         volumes[os.path.realpath(library_path)] = {'bind': '/project/lib', 'mode': 'ro'}
-    printLog(CmdBuildCompiler.format(lib=libs))
     container: Container = client.containers.run(JavaImage, command=wrap_cmd(CmdBuildCompiler.format(lib=libs)),
         detach=True, name=container_name, working_dir='/project', volumes=volumes, mem_limit=MemoryLimit)
     container_wait(container, 'build_compiler')
@@ -100,7 +99,6 @@ def compile_testcase(client: docker.DockerClient, case_fullname: str, compiler_p
         if len(__libs) > 0:
             libs = '-classpath /compiler/compiler:' + ':'.join([os.path.join('/compiler/lib', x.decode('utf-8').strip()) for x in __libs])
         volumes[os.path.realpath(lib_path)] = {'bind': '/compiler/lib', 'mode': 'ro'}
-    printLog(cmd.format(jvm=JvmOptions, opt=OptOptions, lib=libs))
     container: Container = client.containers.run(JavaImage, command=wrap_cmd(cmd.format(jvm=JvmOptions, opt=OptOptions, lib=libs)),
         detach=True, name=container_name, working_dir='/compiler', volumes=volumes, mem_limit=MemoryLimit)
     container_wait(container, 'compile')
