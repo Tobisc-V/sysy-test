@@ -13,7 +13,7 @@ def wrap_cmd(cmd: str) -> str:
 
 def container_wait(container: Container, name: str):
     try:
-        exit = container.wait(timeout=TimeoutSecs)
+        exit: dict = container.wait(timeout=TimeoutSecs)
     except Exception as e:
         try:
             container.kill()
@@ -23,7 +23,7 @@ def container_wait(container: Container, name: str):
     finally:
         if not debug_container:
             container.remove()
-    if exit['Error'] is not None:
+    if exit.get('Error') is not None:
         raise Exception('{name}: container exit with error {err}'.format(name=name, err=exit['Error']))
     elif exit['StatusCode'] != 0:
         raise Exception('{name}: container exit with code {code}'.format(name=name, code=exit['StatusCode'])) # you should see logs dir for further information
